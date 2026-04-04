@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMSP — SP Daily Overview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── THEME TOKENS ─────────────────────────────────────────────────────────── */
+:root {
+  --bg:          #f5f6f8;
+  --surface:     #ffffff;
+  --surface2:    #f0f1f4;
+  --border:      #e4e6eb;
+  --border2:     #d0d3db;
+  --text:        #111318;
+  --text2:       #4b5263;
+  --text3:       #8b92a3;
+  --accent:      #1a56db;
+  --accent-bg:   #eff4ff;
+  --accent-text: #1a56db;
+  --green:       #0e9f6e;
+  --green-bg:    #f0fdf4;
+  --warn:        #d97706;
+  --warn-bg:     #fffbeb;
+  --danger:      #e02424;
+  --danger-bg:   #fef2f2;
+  --info:        #1a56db;
+  --info-bg:     #eff4ff;
+  --sidebar-w:   220px;
+  --sidebar-collapsed: 56px;
+  --topbar-h:    56px;
+  --mono:        'DM Mono', monospace;
+  --sans:        'DM Sans', sans-serif;
+  --radius:      8px;
+  --radius-lg:   12px;
+  --shadow:      0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:   0 4px 12px rgba(0,0,0,.1);
+}
+
+[data-theme="dark"] {
+  --bg:          #0f1117;
+  --surface:     #1a1d27;
+  --surface2:    #222535;
+  --border:      rgba(255,255,255,.08);
+  --border2:     rgba(255,255,255,.14);
+  --text:        #edf0f7;
+  --text2:       #9aa3b8;
+  --text3:       #5c6480;
+  --accent:      #4f8ef7;
+  --accent-bg:   rgba(79,142,247,.12);
+  --accent-text: #7aabff;
+  --green:       #34d399;
+  --green-bg:    rgba(16,185,129,.1);
+  --warn:        #fbbf24;
+  --warn-bg:     rgba(245,158,11,.1);
+  --danger:      #f87171;
+  --danger-bg:   rgba(239,68,68,.1);
+  --info:        #7aabff;
+  --info-bg:     rgba(79,142,247,.12);
+  --shadow:      0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:   0 4px 16px rgba(0,0,0,.4);
+}
+
+/* ── RESET ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background .2s, color .2s;
+}
+
+/* ── UPLOAD SCREEN ────────────────────────────────────────────────────────── */
+#upload-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.upload-logo {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .14em;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 2.5rem;
+}
+.upload-logo span { color: var(--accent); }
+.upload-title {
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: -.02em;
+  color: var(--text);
+  margin-bottom: .35rem;
+  text-align: center;
+}
+.upload-sub {
+  font-size: 13px;
+  color: var(--text3);
+  margin-bottom: 2.5rem;
+  text-align: center;
+}
+.drop-zone {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  box-shadow: var(--shadow);
+}
+.drop-zone:hover, .drop-zone.over {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.drop-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--accent-bg);
+  border-radius: 10px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drop-icon svg { width: 20px; height: 20px; color: var(--accent); }
+.drop-label { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: .3rem; }
+.drop-hint  { font-size: 12px; color: var(--text3); }
+.browse-btn {
+  margin-top: 1.25rem;
+  padding: 9px 22px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: opacity .15s;
+}
+.browse-btn:hover { opacity: .88; }
+#file-input { display: none; }
+.sheet-wrap { margin-top: 1.25rem; display: none; text-align: left; }
+.sheet-wrap label { font-size: 11px; color: var(--text3); display: block; margin-bottom: 5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--sans);
+  width: 100%;
+  transition: border-color .15s;
+}
+select:focus { outline: none; border-color: var(--accent); }
+.load-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 11px;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: opacity .15s;
+}
+.load-btn:hover { opacity: .88; }
+.err { color: var(--danger); font-size: 12px; margin-top: .75rem; font-family: var(--mono); }
+
+/* theme toggle on upload screen */
+.theme-toggle-float {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  box-shadow: var(--shadow);
+  transition: all .15s;
+}
+.theme-toggle-float:hover { border-color: var(--accent); color: var(--accent); }
+.toggle-icon { font-size: 14px; }
+
+/* ── APP SHELL ────────────────────────────────────────────────────────────── */
+#app { display: none; height: 100vh; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  transition: width .25s cubic-bezier(.4,0,.2,1), background .2s, border-color .2s;
+  overflow: hidden;
+}
+
+/* collapsed = icon-only rail */
+.sidebar.collapsed { width: var(--sidebar-collapsed); }
+
+/* hide text content when collapsed — opacity+width trick avoids layout jump */
+.sidebar .nav-label,
+.sidebar .nav-badge,
+.sidebar .sidebar-sub,
+.sidebar .sidebar-date,
+.sidebar .sidebar-brand,
+.sidebar .footer-label {
+  opacity: 1;
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 1;
+  transition: opacity .2s, max-width .25s cubic-bezier(.4,0,.2,1), margin .25s, padding .25s;
+}
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-badge,
+.sidebar.collapsed .sidebar-sub,
+.sidebar.collapsed .sidebar-date,
+.sidebar.collapsed .sidebar-brand,
+.sidebar.collapsed .footer-label {
+  opacity: 0;
+  max-width: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* section labels fade + collapse height to zero */
+.sidebar .nav-section-label {
+  opacity: 1;
+  max-height: 40px;
+  overflow: hidden;
+  transition: opacity .15s, max-height .25s cubic-bezier(.4,0,.2,1), padding .25s;
+}
+.sidebar.collapsed .nav-section-label {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* collapsed nav items: truly centered icons, full width for click target */
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+  width: 100%;
+  text-align: center;
+}
+.sidebar.collapsed .sidebar-footer-btn {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+  width: 100%;
+}
+.sidebar.collapsed .sidebar-header { justify-content: center; padding: 14px 0; }
+.sidebar.collapsed .sidebar-nav { padding: 8px 0; }
+.sidebar.collapsed .sidebar-footer { padding: 8px 0; align-items: center; }
+.sidebar.collapsed .nav-icon { margin: 0; flex-shrink: 0; }
+.sidebar.collapsed .nav-item .nav-icon { display: block; }
+.sidebar.collapsed .nav-item span.nav-label { width: 0; padding: 0; margin: 0; }
+.sidebar.collapsed .sidebar-footer-btn svg { display: block; margin: 0 auto; }
+
+/* collapse toggle button */
+.collapse-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text3);
+  transition: background .15s, color .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.collapse-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+.collapse-btn svg { width: 14px; height: 14px; transition: transform .25s cubic-bezier(.4,0,.2,1); }
+.sidebar.collapsed .collapse-btn svg { transform: rotate(180deg); }
+.sidebar-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-brand {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.sidebar-brand span { color: var(--accent); }
+.sidebar-sub {
+  font-size: 11px;
+  color: var(--text3);
+}
+.sidebar-date {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  display: inline-block;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  overflow-y: auto;
+}
+.nav-section-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 10px 10px 5px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text2);
+  transition: background .12s, color .12s, justify-content .25s, padding .25s;
+  text-decoration: none;
+  margin-bottom: 1px;
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: var(--sans);
+}
+.nav-item:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+.nav-item.active {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+.nav-item.active .nav-icon { color: var(--accent); }
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text3);
+  display: block;
+}
+.nav-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 500;
+}
+.nav-badge.warn { background: var(--warn-bg); color: var(--warn); }
+.nav-badge.ok   { background: var(--green-bg); color: var(--green); }
+.nav-badge.info { background: var(--info-bg); color: var(--info); }
+
+.sidebar-footer {
+  padding: 12px 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text3);
+  background: transparent;
+  border: none;
+  font-family: var(--sans);
+  width: 100%;
+  transition: background .12s, color .12s, justify-content .25s, padding .25s;
+}
+.sidebar-footer-btn:hover { background: var(--surface2); color: var(--text2); }
+
+/* TOPBAR */
+.topbar {
+  position: fixed;
+  left: var(--sidebar-w);
+  right: 0;
+  top: 0;
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  z-index: 100;
+  transition: left .22s cubic-bezier(.4,0,.2,1), background .2s, border-color .2s;
+}
+#app.sidebar-collapsed .topbar { left: var(--sidebar-collapsed); }
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vwrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.vwrap label {
+  font-size: 11px;
+  color: var(--text3);
+  white-space: nowrap;
+  font-weight: 500;
+}
+.vwrap select { width: auto; padding: 5px 8px; font-size: 12px; }
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  transition: all .15s;
+  font-family: var(--sans);
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* MAIN CONTENT */
+.content {
+  margin-left: var(--sidebar-w);
+  margin-top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
+  overflow-y: auto;
+  padding: 1.5rem;
+  scroll-behavior: smooth;
+  transition: margin-left .22s cubic-bezier(.4,0,.2,1);
+}
+#app.sidebar-collapsed .content { margin-left: var(--sidebar-collapsed); }
+
+/* ── SECTIONS ─────────────────────────────────────────────────────────────── */
+.section {
+  margin-bottom: 2rem;
+  scroll-margin-top: 1.5rem;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: .01em;
+}
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── FLAGS PANEL ─────────────────────────────────────────────────────────── */
+.flags-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.flags-panel-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.flags-panel-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.flag-pill {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.flag-pill.danger { background: var(--danger-bg); color: var(--danger); }
+.flag-pill.clean  { background: var(--green-bg);  color: var(--green);  }
+.flags-body { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.flag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border-left: 3px solid transparent;
+}
+.flag-row.crit { border-left-color: var(--danger); background: var(--danger-bg); }
+.flag-row.warn { border-left-color: var(--warn);   background: var(--warn-bg);   }
+.flag-row.info { border-left-color: var(--info);   background: var(--info-bg);   }
+.flag-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.flag-dot.crit { background: var(--danger); }
+.flag-dot.warn { background: var(--warn);   }
+.flag-dot.info { background: var(--info);   }
+.flag-text { font-size: 12px; line-height: 1.55; color: var(--text); }
+.flag-text strong { font-weight: 500; }
+.flag-text .dim { color: var(--text3); }
+.no-flags { padding: 1rem; font-size: 12px; color: var(--green); font-family: var(--mono); }
+
+/* ── KPI STRIP ─────────────────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0,1fr));
+  gap: 10px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.kpi-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+.kpi-val {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: -.02em;
+  color: var(--text);
+  line-height: 1.1;
+}
+.kpi-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.kpi-val.danger { color: var(--danger); }
+.kpi-val.warn   { color: var(--warn);   }
+.kpi-val.good   { color: var(--green);  }
+
+/* ── CHART CARDS ──────────────────────────────────────────────────────────── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 14px;
+}
+
+/* ── TABLE CARDS ──────────────────────────────────────────────────────────── */
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.table-card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--surface2);
+}
+.table-card-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.pills { display: flex; gap: 5px; flex-wrap: wrap; }
+.pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--mono);
+  transition: all .12s;
+}
+.pill:hover { border-color: var(--accent); color: var(--accent); }
+.pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.table-wrap { overflow-x: auto; }
+.table-wrap.scrollable { max-height: 420px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--surface);
+  font-weight: 400;
+}
+.table-wrap.scrollable thead th { position: sticky; top: 0; z-index: 1; }
+td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--surface2); }
+.row-flagged td { background: rgba(224,36,36,.03); }
+[data-theme="dark"] .row-flagged td { background: rgba(239,68,68,.05); }
+
+.rsp-tag { font-family: var(--mono); font-size: 11px; font-weight: 500; }
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-weight: 500;
+}
+.bok    { background: var(--green-bg);  color: var(--green);  }
+.bwarn  { background: var(--warn-bg);   color: var(--warn);   }
+.bcrit  { background: var(--danger-bg); color: var(--danger); }
+.bgray  { background: var(--surface2);  color: var(--text3);  }
+.binfo  { background: var(--info-bg);   color: var(--info);   }
+.cell-crit { color: var(--danger); font-weight: 500; }
+.cell-warn { color: var(--warn);   font-weight: 500; }
+.cell-note { color: var(--text3);  font-size: 10px;  }
+.dim-dash  { color: var(--text3); }
+
+/* ── CUBE BARS ─────────────────────────────────────────────────────────────── */
+.cube-body { padding: 12px 16px; }
+.cb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.cb-rank { font-family: var(--mono); font-size: 10px; color: var(--text3); width: 22px; text-align: right; flex-shrink: 0; }
+.cb-rsp  { font-family: var(--mono); font-size: 10px; font-weight: 500; width: 52px; flex-shrink: 0; }
+.cb-track { flex: 1; height: 11px; background: var(--surface2); border-radius: 3px; position: relative; overflow: visible; }
+.cb-fill  { height: 100%; border-radius: 3px; transition: width .35s ease; }
+.cb-val  { font-family: var(--mono); font-size: 10px; color: var(--text3); width: 40px; text-align: right; flex-shrink: 0; }
+.cb-pct  { font-family: var(--mono); font-size: 10px; color: var(--text3); width: 34px; flex-shrink: 0; }
+.cb-ceil { position: absolute; top: -3px; height: 17px; width: 1.5px; background: var(--danger); opacity: .5; }
+
+/* ── SCROLLBAR ─────────────────────────────────────────────────────────────── */
+.content::-webkit-scrollbar,
+.sidebar-nav::-webkit-scrollbar,
+.table-wrap.scrollable::-webkit-scrollbar { width: 5px; }
+.content::-webkit-scrollbar-track,
+.sidebar-nav::-webkit-scrollbar-track,
+.table-wrap.scrollable::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb,
+.sidebar-nav::-webkit-scrollbar-thumb,
+.table-wrap.scrollable::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<!-- THEME TOGGLE (upload screen) -->
+<button class="theme-toggle-float" onclick="toggleTheme()" id="theme-float">
+  <span class="toggle-icon" id="theme-icon-float">&#9790;</span>
+  <span id="theme-label-float">Dark</span>
+</button>
+
+<!-- ── UPLOAD SCREEN ──────────────────────────────────────────────────────── -->
+<div id="upload-screen">
+  <div class="upload-logo"><span>MMSP</span> / Operations Intelligence</div>
+  <h1 class="upload-title">SP Daily Overview</h1>
+  <p class="upload-sub">Upload your daily export to generate today's operational read</p>
+  <div class="drop-zone" id="dz">
+    <div class="drop-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="drop-label">Drop your .xlsx file here</div>
+    <div class="drop-hint">SP Daily Overview — Ops export</div>
+    <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse file</button>
+    <input type="file" id="file-input" accept=".xlsx,.xls">
+    <div class="sheet-wrap" id="sheet-wrap">
+      <label>Select sheet</label>
+      <select id="sheet-sel"></select>
+      <button class="load-btn" onclick="loadSheet()">Load dashboard</button>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ──────────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 14px;border-bottom:1px solid var(--border);gap:8px;">
+      <div class="sidebar-brand-wrap" style="overflow:hidden;">
+        <div class="sidebar-brand"><span>MMSP</span> / Ops</div>
+        <div class="sidebar-sub">SP Daily Overview</div>
+        <div class="sidebar-date" id="sb-date">—</div>
+      </div>
+      <button class="collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <button class="nav-item active" onclick="scrollTo('sec-flags')" id="nav-flags">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span class="nav-label">Disconnects</span>
+        <span class="nav-badge" id="nb-flags">—</span>
+      </button>
+      <button class="nav-item" onclick="scrollTo('sec-kpi')" id="nav-kpi">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span class="nav-label">KPI Summary</span>
+      </button>
+
+      <div class="nav-section-label">RSP Performance</div>
+      <button class="nav-item" onclick="scrollTo('sec-charts')" id="nav-charts">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="nav-label">Charts</span>
+      </button>
+      <button class="nav-item" onclick="scrollTo('sec-rsp')" id="nav-rsp">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <span class="nav-label">RSP Summary</span>
+        <span class="nav-badge warn" id="nb-app">—</span>
+      </button>
+
+      <div class="nav-section-label">Route Analysis</div>
+      <button class="nav-item" onclick="scrollTo('sec-cube')" id="nav-cube">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        <span class="nav-label">Cube Utilization</span>
+      </button>
+      <button class="nav-item" onclick="scrollTo('sec-routes')" id="nav-routes">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span class="nav-label">Route Detail</span>
+        <span class="nav-badge" id="nb-noatt">—</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-footer-btn" onclick="toggleTheme()">
+        <svg style="width:15px;height:15px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span class="footer-label" id="theme-sidebar-label">Dark mode</span>
+      </button>
+      <button class="sidebar-footer-btn" onclick="resetDash()">
+        <svg style="width:15px;height:15px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        <span class="footer-label">New file</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title" id="topbar-title">SP Daily Overview</span>
+    </div>
+    <div class="topbar-right">
+      <div class="vwrap">
+        <label>Vehicle ceiling:</label>
+        <select id="vsel" onchange="onCeilChange()">
+          <option value="75">SUV — 75 ft³</option>
+          <option value="120" selected>Minivan — 120 ft³</option>
+          <option value="250">Cargo van — 250 ft³</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENT -->
+  <main class="content" id="content">
+
+    <!-- DISCONNECTS -->
+    <div class="section" id="sec-flags">
+      <div class="section-header">
+        <span class="section-title">Disconnects</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="flags-panel">
+        <div class="flags-panel-header">
+          <div class="flags-panel-title">
+            Requires attention
+            <span class="flag-pill danger" id="fp-count">—</span>
+          </div>
+        </div>
+        <div class="flags-body" id="flags-body"></div>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="section" id="sec-kpi">
+      <div class="section-header">
+        <span class="section-title">KPI Summary</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="section" id="sec-charts">
+      <div class="section-header">
+        <span class="section-title">RSP Performance</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="card-title">Pieces per on-area hour</div><div style="position:relative;height:190px;"><canvas id="c1"></canvas></div></div>
+        <div class="chart-card"><div class="card-title">Avg total cube</div><div style="position:relative;height:190px;"><canvas id="c2"></canvas></div></div>
+        <div class="chart-card"><div class="card-title">Stops vs pieces</div><div style="position:relative;height:190px;"><canvas id="c3"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- RSP SUMMARY -->
+    <div class="section" id="sec-rsp">
+      <div class="section-header">
+        <span class="section-title">RSP Summary</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="table-card">
+        <div class="table-card-header">
+          <div class="table-card-title">All RSPs</div>
+          <div class="pills" id="rsort">
+            <button class="pill active" onclick="sortRSP('rsp',this)">RSP #</button>
+            <button class="pill" onclick="sortRSP('pph',this)">PPH</button>
+            <button class="pill" onclick="sortRSP('cube',this)">Cube</button>
+            <button class="pill" onclick="sortRSP('noatt',this)">No attempt</button>
+            <button class="pill" onclick="sortRSP('stem',this)">Stem</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>RSP</th><th>Routes</th><th>Stops</th><th>Pieces</th>
+              <th>Avg PPH</th><th>Avg stem</th><th>Avg in-facility</th>
+              <th>Avg total time</th><th>Avg cube</th><th>Cube tier</th>
+              <th>No attempt</th><th>App flags</th>
+            </tr></thead>
+            <tbody id="rsp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUBE -->
+    <div class="section" id="sec-cube">
+      <div class="section-header">
+        <span class="section-title">Cube Utilization</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="table-card">
+        <div class="table-card-header">
+          <div class="table-card-title">All routes — sorted low to high</div>
+          <div class="pills" id="cube-pills"></div>
+        </div>
+        <div class="cube-body" id="cube-body"></div>
+      </div>
+    </div>
+
+    <!-- ROUTES -->
+    <div class="section" id="sec-routes">
+      <div class="section-header">
+        <span class="section-title">Route Detail</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="table-card">
+        <div class="table-card-header">
+          <div class="table-card-title">All routes</div>
+          <div class="pills" id="route-pills"></div>
+        </div>
+        <div class="table-wrap scrollable">
+          <table>
+            <thead><tr>
+              <th>SP</th><th>RSP</th><th>In facility</th><th>Stem</th>
+              <th>Total time</th><th>Stops</th><th>Pieces</th><th>PPH</th>
+              <th>Cube</th><th>Cube %</th><th>No attempt</th><th>App ver</th><th>Flags</th>
+            </tr></thead>
+            <tbody id="route-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div><!-- end #app -->
+
+<script>
+/* ── CONSTANTS ───────────────────────────────────────────────────────────── */
+var LATEST_APP = '2.1.6';
+var FAC_GOAL   = 1.20;
+var TIME_MAX   = 8.0;
+var PPH_MIN    = 12;
+var COLORS_LT  = ['#1a56db','#0e9f6e','#7e3af2','#d97706','#e74694','#0694a2','#3f83f8','#ff5a1f'];
+var COLORS_DK  = ['#4f8ef7','#34d399','#a78bfa','#fbbf24','#f472b6','#22d3ee','#60a5fa','#fb923c'];
+
+var allData     = [];
+var rspSum      = [];
+var charts      = {};
+var sortCol     = 'rsp';
+var cubeFilter  = 'all';
+var routeFilter = 'all';
+var wb;
+var isDark      = false;
+
+/* ── SIDEBAR COLLAPSE ────────────────────────────────────────────────────── */
+var sidebarCollapsed = false;
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  document.querySelector('.sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  document.getElementById('app').classList.toggle('sidebar-collapsed', sidebarCollapsed);
+}
+
+/* ── THEME ───────────────────────────────────────────────────────────────── */
+function toggleTheme() {
+  isDark = !isDark;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.getElementById('theme-sidebar-label').textContent  = isDark ? 'Light mode' : 'Dark mode';
+  document.getElementById('theme-label-float').textContent    = isDark ? 'Light' : 'Dark';
+  document.getElementById('theme-icon-float').textContent     = isDark ? '\u2600' : '\u263E';
+  if (allData.length) renderCharts();
+}
+
+/* ── SCROLL NAV ──────────────────────────────────────────────────────────── */
+function scrollTo(id) {
+  var el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
+  var navMap = { 'sec-flags':'nav-flags','sec-kpi':'nav-kpi','sec-charts':'nav-charts',
+                 'sec-rsp':'nav-rsp','sec-cube':'nav-cube','sec-routes':'nav-routes' };
+  var navId = navMap[id];
+  if (navId) document.getElementById(navId).classList.add('active');
+}
+
+/* highlight active nav on scroll */
+function onScroll() {
+  var sections = ['sec-flags','sec-kpi','sec-charts','sec-rsp','sec-cube','sec-routes'];
+  var navMap   = { 'sec-flags':'nav-flags','sec-kpi':'nav-kpi','sec-charts':'nav-charts',
+                   'sec-rsp':'nav-rsp','sec-cube':'nav-cube','sec-routes':'nav-routes' };
+  var scrollTop = document.getElementById('content').scrollTop + 80;
+  var current = sections[0];
+  sections.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && el.offsetTop <= scrollTop) current = id;
+  });
+  document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.remove('active'); });
+  if (navMap[current]) document.getElementById(navMap[current]).classList.add('active');
+}
+
+/* ── DROP ZONE ───────────────────────────────────────────────────────────── */
+var dz = document.getElementById('dz');
+dz.addEventListener('dragover',  function(e){ e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('over'); });
+dz.addEventListener('drop',      function(e){ e.preventDefault(); dz.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
+document.getElementById('file-input').addEventListener('change', function(e){ handleFile(e.target.files[0]); });
+
+function handleFile(f) {
+  if (!f) return;
+  document.getElementById('err').textContent = '';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      var sheets = wb.SheetNames;
+      var sel = document.getElementById('sheet-sel');
+      sel.innerHTML = sheets.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
+      if (sheets.length === 1) { loadSheet(); return; }
+      document.getElementById('sheet-wrap').style.display = 'block';
+    } catch(err) {
+      document.getElementById('err').textContent = 'Could not read file: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+function loadSheet() {
+  var sn  = document.getElementById('sheet-sel').value || wb.SheetNames[0];
+  var raw = XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: null });
+  if (!raw.length) { document.getElementById('err').textContent = 'Sheet appears empty.'; return; }
+  processData(raw);
+}
+
+/* ── HELPERS ─────────────────────────────────────────────────────────────── */
+function nv(row) {
+  var terms = Array.prototype.slice.call(arguments, 1);
+  var keys  = Object.keys(row);
+  for (var i = 0; i < terms.length; i++) {
+    var t = terms[i].toLowerCase();
+    var k = keys.find(function(k){ return k.toLowerCase().indexOf(t) !== -1; });
+    if (k !== undefined && row[k] !== null) return parseFloat(row[k]) || 0;
+  }
+  return 0;
+}
+function sv(row) {
+  var terms = Array.prototype.slice.call(arguments, 1);
+  var keys  = Object.keys(row);
+  for (var i = 0; i < terms.length; i++) {
+    var t = terms[i].toLowerCase();
+    var k = keys.find(function(k){ return k.toLowerCase().indexOf(t) !== -1; });
+    if (k !== undefined && row[k] !== null) return String(row[k]);
+  }
+  return '—';
+}
+function getCeil() { return parseInt(document.getElementById('vsel').value, 10); }
+function uniqueRSPs() { return [...new Set(allData.map(function(r){ return r.rsp; }))].sort(function(a,b){ return a-b; }); }
+function rspColor(rsp) {
+  var u = uniqueRSPs();
+  var palette = isDark ? COLORS_DK : COLORS_LT;
+  return palette[u.indexOf(rsp) % palette.length];
+}
+function cubeTier(cube) {
+  var c = getCeil(), pct = cube / c * 100;
+  if (cube < 2)   return { label: 'no load',      cls: 'bgray' };
+  if (pct < 40)   return { label: 'under-used',   cls: 'bwarn' };
+  if (pct <= 80)  return { label: 'optimal',      cls: 'bok'   };
+  if (pct <= 100) return { label: 'near ceiling', cls: 'bwarn' };
+  return                 { label: 'over ceiling', cls: 'bcrit' };
+}
+function badge(text, cls) { return '<span class="badge ' + cls + '">' + text + '</span>'; }
+function dimDash()         { return '<span class="dim-dash">—</span>'; }
+
+/* ── DATA ────────────────────────────────────────────────────────────────── */
+function processData(raw) {
+  try {
+    allData = raw.map(function(r) {
+      var dateRaw = sv(r, 'service date', 'date');
+      var dateStr = '—';
+      try { if (dateRaw !== '—') { var d = new Date(dateRaw); if (!isNaN(d)) dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } } catch(e) {}
+      return {
+        sp: nv(r,'  sp',' sp','sp'), rsp: nv(r,'rsp'), date: dateStr,
+        inFac: nv(r,'facility'), stem: nv(r,'stem'), onArea: nv(r,'on area'),
+        totalTime: nv(r,'total time'), stops: nv(r,'total stops'),
+        pieces: nv(r,'total stop pieces','stop pieces'),
+        noAtt: nv(r,'no attempt','od -'), pph: nv(r,'pieces per'),
+        cube: nv(r,'total cube','cube'), appVer: sv(r,'application','app ver','version'),
+      };
+    });
+
+    var dates = allData.map(function(r){ return r.date; }).filter(function(d){ return d && d !== '—'; });
+    var dateLabel = dates.length ? dates[0] : 'Date unknown';
+    document.getElementById('sb-date').textContent     = dateLabel;
+    document.getElementById('topbar-title').textContent = 'SP Daily Overview — ' + dateLabel;
+
+    buildRSPSummary();
+    renderAll();
+
+    document.getElementById('content').addEventListener('scroll', onScroll);
+    document.getElementById('upload-screen').style.display = 'none';
+    document.getElementById('theme-float').style.display   = 'none';
+    document.getElementById('app').style.display           = 'block';
+  } catch(err) {
+    document.getElementById('err').textContent = 'Error processing data: ' + err.message;
+  }
+}
+
+function buildRSPSummary() {
+  var groups = {};
+  allData.forEach(function(r) { if (!groups[r.rsp]) groups[r.rsp] = []; groups[r.rsp].push(r); });
+  rspSum = Object.keys(groups).map(function(rsp) {
+    var rows = groups[rsp];
+    var vp   = rows.filter(function(r){ return r.pph > 0; });
+    return {
+      rsp: +rsp, routes: rows.length,
+      stops:   rows.reduce(function(s,r){ return s+r.stops;     },0),
+      pieces:  rows.reduce(function(s,r){ return s+r.pieces;    },0),
+      noAtt:   rows.reduce(function(s,r){ return s+r.noAtt;     },0),
+      avgPph:  vp.length ? vp.reduce(function(s,r){ return s+r.pph; },0)/vp.length : 0,
+      avgStem: rows.reduce(function(s,r){ return s+r.stem;      },0)/rows.length,
+      avgFac:  rows.reduce(function(s,r){ return s+r.inFac;     },0)/rows.length,
+      avgTime: rows.reduce(function(s,r){ return s+r.totalTime; },0)/rows.length,
+      avgCube: rows.reduce(function(s,r){ return s+r.cube;      },0)/rows.length,
+      appFlags: rows.filter(function(r){ return r.appVer && r.appVer !== '—' && r.appVer !== LATEST_APP && r.stops > 0; }).length,
+    };
+  });
+}
+
+/* ── FLAG ENGINE ─────────────────────────────────────────────────────────── */
+function getRouteFlags(r) {
+  var flags = [], c = getCeil();
+  if (r.totalTime > TIME_MAX && r.stops > 0)
+    flags.push({ sev:'crit', code:'TOTAL_TIME', msg:'Total time '+r.totalTime.toFixed(2)+' hrs — exceeds 8hr ceiling' });
+  if (r.inFac > FAC_GOAL) {
+    var hc = r.cube > 0 && (r.cube/c) > 0.6;
+    flags.push({ sev:'warn', code:'IN_FAC', msg:'In-facility '+r.inFac.toFixed(2)+' hrs — above 1.20 goal'+(hc?' (cube '+r.cube.toFixed(1)+' ft³ may be a factor)':'') });
+  }
+  if (r.noAtt > 0)
+    flags.push({ sev:'crit', code:'NO_ATT', msg:r.noAtt+' OD no-attempt piece'+(r.noAtt>1?'s':'')+' — manifest left open' });
+  if (r.pph > 0 && r.pph < PPH_MIN && r.stops > 5)
+    flags.push({ sev:'warn', code:'PPH', msg:'PPH '+r.pph.toFixed(1)+' — below 12 threshold' });
+  if (r.appVer && r.appVer !== '—' && r.appVer !== LATEST_APP && r.stops > 0)
+    flags.push({ sev:'info', code:'APP', msg:'App version '+r.appVer+' — not on '+LATEST_APP });
+  if (r.cube/c > 1 && r.cube > 5)
+    flags.push({ sev:'warn', code:'CUBE', msg:'Cube '+r.cube.toFixed(1)+' ft³ — over vehicle ceiling ('+Math.round(r.cube/c*100)+'%)' });
+  return flags;
+}
+
+function buildFlagsPanel() {
+  var sf = [], c = getCeil();
+
+  /* no attempt by RSP */
+  var naRSP = {};
+  allData.forEach(function(r){ if(r.noAtt>0){ if(!naRSP[r.rsp])naRSP[r.rsp]=0; naRSP[r.rsp]+=r.noAtt; } });
+  Object.keys(naRSP).forEach(function(rsp){
+    var t=naRSP[rsp];
+    sf.push({sev:'crit', text:'<strong>RSP '+rsp+'</strong> — '+t+' OD no-attempt piece'+(t>1?'s':'')+' left open in manifest. <span class="dim">Conversation goes to the RSP.</span>'});
+  });
+
+  /* total time — grouped by RSP */
+  var longByRSP = {};
+  allData.filter(function(r){ return r.totalTime>TIME_MAX&&r.stops>0; }).forEach(function(r){
+    if(!longByRSP[r.rsp]) longByRSP[r.rsp]=[];
+    longByRSP[r.rsp].push(r);
+  });
+  Object.keys(longByRSP).forEach(function(rsp){
+    var routes = longByRSP[rsp];
+    var avgTime = routes.reduce(function(s,r){ return s+r.totalTime; },0)/routes.length;
+    var maxTime = Math.max.apply(null, routes.map(function(r){ return r.totalTime; }));
+    sf.push({sev:'crit',
+      text:'<strong>RSP '+rsp+'</strong> — '+routes.length+' route'+(routes.length>1?'s':'')+' exceeded 8hr total time. '+
+           '<span class="dim">Avg '+avgTime.toFixed(2)+' hrs, max '+maxTime.toFixed(2)+' hrs across '+routes.length+' SP'+(routes.length>1?'s':'')+'.</span>'});
+  });
+
+  /* in facility — grouped by RSP */
+  var facByRSP = {};
+  allData.filter(function(r){ return r.inFac>FAC_GOAL&&r.stops>0; }).forEach(function(r){
+    if(!facByRSP[r.rsp]) facByRSP[r.rsp]=[];
+    facByRSP[r.rsp].push(r);
+  });
+  Object.keys(facByRSP).forEach(function(rsp){
+    var routes = facByRSP[rsp];
+    var worst  = routes.reduce(function(a,b){ return a.inFac>b.inFac?a:b; });
+    var highCubeCount = routes.filter(function(r){ return r.cube>0&&(r.cube/c)>0.6; }).length;
+    sf.push({sev:'warn',
+      text:'<strong>RSP '+rsp+'</strong> — '+routes.length+' route'+(routes.length>1?'s':'')+' above 1.20 in-facility goal. '+
+           '<span class="dim">Worst: SP '+worst.sp+' at '+worst.inFac.toFixed(2)+' hrs.'+(highCubeCount>0?' '+highCubeCount+' may be cube-related.':'')+'</span>'});
+  });
+
+  /* PPH — grouped by RSP */
+  var pphByRSP = {};
+  allData.filter(function(r){ return r.pph>0&&r.pph<PPH_MIN&&r.stops>5; }).forEach(function(r){
+    if(!pphByRSP[r.rsp]) pphByRSP[r.rsp]=[];
+    pphByRSP[r.rsp].push(r);
+  });
+  Object.keys(pphByRSP).forEach(function(rsp){
+    var routes = pphByRSP[rsp];
+    var avgPph = routes.reduce(function(s,r){ return s+r.pph; },0)/routes.length;
+    sf.push({sev:'warn',
+      text:'<strong>RSP '+rsp+'</strong> — '+routes.length+' route'+(routes.length>1?'s':'')+' below 12 PPH threshold. '+
+           '<span class="dim">Avg '+avgPph.toFixed(1)+' PPH — verify if rural routes.</span>'});
+  });
+
+  /* app */
+  var appRSP = {};
+  allData.filter(function(r){ return r.appVer&&r.appVer!=='—'&&r.appVer!==LATEST_APP&&r.stops>0; }).forEach(function(r){
+    if(!appRSP[r.rsp]) appRSP[r.rsp]=[];
+    appRSP[r.rsp].push({sp:r.sp,ver:r.appVer});
+  });
+  Object.keys(appRSP).forEach(function(rsp){
+    var sps=appRSP[rsp];
+    sf.push({sev:'info', text:'<strong>RSP '+rsp+'</strong> — '+sps.length+' SP'+(sps.length>1?'s':'')+' on outdated app: '+sps.map(function(s){ return 'SP '+s.sp+' ('+s.ver+')'; }).join(', ')+'. <span class="dim">Current: '+LATEST_APP+'</span>'});
+  });
+
+  /* stem contextual — grouped by RSP */
+  var stemByRSP = {};
+  allData.filter(function(r){ return r.stem>1.5&&r.stops>0; }).forEach(function(r){
+    if(!stemByRSP[r.rsp]) stemByRSP[r.rsp]=[];
+    stemByRSP[r.rsp].push(r);
+  });
+  Object.keys(stemByRSP).forEach(function(rsp){
+    var routes  = stemByRSP[rsp];
+    var avgStem = routes.reduce(function(s,r){ return s+r.stem; },0)/routes.length;
+    sf.push({sev:'info',
+      text:'<strong>RSP '+rsp+'</strong> — '+routes.length+' route'+(routes.length>1?'s':'')+' with stem time above 1.50 hrs. '+
+           '<span class="dim">Avg stem '+avgStem.toFixed(2)+' hrs — note contextually.</span>'});
+  });
+
+  var body = document.getElementById('flags-body');
+  var pill = document.getElementById('fp-count');
+  var nb   = document.getElementById('nb-flags');
+
+  if (!sf.length) {
+    body.innerHTML = '<div class="no-flags">&#10003; No disconnects identified for this file.</div>';
+    pill.textContent = '0 flags'; pill.className = 'flag-pill clean';
+    nb.textContent = '0'; nb.className = 'nav-badge ok';
+    return;
+  }
+
+  var sevOrd = {crit:0,warn:1,info:2};
+  sf.sort(function(a,b){ return sevOrd[a.sev]-sevOrd[b.sev]; });
+  body.innerHTML = sf.map(function(f){
+    return '<div class="flag-row '+f.sev+'">' +
+           '<div class="flag-dot '+f.sev+'"></div>' +
+           '<div class="flag-text">'+f.text+'</div></div>';
+  }).join('');
+
+  var crit = sf.filter(function(f){ return f.sev==='crit'; }).length;
+  pill.textContent = sf.length+' flag'+(sf.length!==1?'s':'')+(crit>0?' · '+crit+' critical':'');
+  pill.className   = crit > 0 ? 'flag-pill danger' : 'flag-pill warn';
+  nb.textContent   = sf.length; nb.className = crit > 0 ? 'nav-badge' : 'nav-badge warn';
+}
+
+/* ── RENDER ──────────────────────────────────────────────────────────────── */
+function renderAll() {
+  renderKPIs();
+  renderCharts();
+  renderRSPTable();
+  buildFlagsPanel();
+  buildFilterPills();
+  renderCubeBars();
+  renderRouteTable();
+  updateNavBadges();
+}
+
+function updateNavBadges() {
+  var noAtt    = allData.reduce(function(s,r){ return s+r.noAtt; },0);
+  var appCount = allData.filter(function(r){ return r.appVer&&r.appVer!=='—'&&r.appVer!==LATEST_APP&&r.stops>0; }).length;
+  var nb = document.getElementById('nb-noatt');
+  nb.textContent = noAtt > 0 ? noAtt : '';
+  nb.style.display = noAtt > 0 ? '' : 'none';
+  var nba = document.getElementById('nb-app');
+  nba.textContent = appCount > 0 ? appCount : '';
+  nba.style.display = appCount > 0 ? '' : 'none';
+}
+
+function renderKPIs() {
+  var stops      = allData.reduce(function(s,r){ return s+r.stops;   },0);
+  var pcs        = allData.reduce(function(s,r){ return s+r.pieces;  },0);
+  var noAtt      = allData.reduce(function(s,r){ return s+r.noAtt;   },0);
+  var vp         = allData.filter(function(r){ return r.pph>0&&r.stops>5; });
+  var avgPph     = vp.length ? vp.reduce(function(s,r){ return s+r.pph; },0)/vp.length : 0;
+  var avgCube    = allData.reduce(function(s,r){ return s+r.cube; },0)/allData.length;
+  var appF       = allData.filter(function(r){ return r.appVer&&r.appVer!=='—'&&r.appVer!==LATEST_APP&&r.stops>0; }).length;
+  var longR      = allData.filter(function(r){ return r.totalTime>TIME_MAX&&r.stops>0; }).length;
+
+  document.getElementById('kpi-grid').innerHTML =
+    kpi('Routes',         allData.length,        uniqueRSPs().length+' RSPs active', '') +
+    kpi('Total stops',    stops.toLocaleString(), pcs.toLocaleString()+' pieces',    '') +
+    kpi('Avg PPH',        avgPph.toFixed(1),      'pieces per on-area hr',           avgPph<PPH_MIN?'warn':avgPph>=16?'good':'') +
+    kpi('No-attempt pcs', noAtt,                  noAtt>0?'OD flag — talk to RSP':'Clean', noAtt>0?'danger':'good') +
+    kpi('Routes > 8hrs',  longR,                  longR>0?'Review required':'None',  longR>0?'danger':'') +
+    kpi('App compliance', appF,                   appF>0?'Not on '+LATEST_APP:'All on '+LATEST_APP, appF>0?'warn':'good');
+}
+
+function kpi(label, val, sub, cls) {
+  return '<div class="kpi-card">' +
+         '<div class="kpi-label">'+label+'</div>' +
+         '<div class="kpi-val '+cls+'">'+val+'</div>' +
+         '<div class="kpi-sub">'+sub+'</div>' +
+         '</div>';
+}
+
+function renderCharts() {
+  var labels = rspSum.map(function(r){ return 'RSP '+r.rsp; });
+  var colors = rspSum.map(function(r){ return rspColor(r.rsp); });
+  var gridColor = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+  var tickColor = isDark ? '#5c6480' : '#8b92a3';
+
+  var base = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: tickColor, font: { size: 10, family: "'DM Mono', monospace" } }, grid: { display: false } },
+      y: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } }
+    }
+  };
+
+  Object.values(charts).forEach(function(c){ c.destroy(); });
+  charts = {};
+
+  charts.c1 = new Chart(document.getElementById('c1'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: rspSum.map(function(r){ return +r.avgPph.toFixed(2); }), backgroundColor: colors, borderWidth: 0, borderRadius: 4 }] },
+    options: base
+  });
+  charts.c2 = new Chart(document.getElementById('c2'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: rspSum.map(function(r){ return +r.avgCube.toFixed(1); }), backgroundColor: colors, borderWidth: 0, borderRadius: 4 }] },
+    options: base
+  });
+  charts.c3 = new Chart(document.getElementById('c3'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [
+      { label:'Stops',  data: rspSum.map(function(r){ return r.stops;  }), backgroundColor: colors,                                   borderWidth:0, borderRadius:4 },
+      { label:'Pieces', data: rspSum.map(function(r){ return r.pieces; }), backgroundColor: colors.map(function(c){ return c+'55'; }), borderWidth:0, borderRadius:4 }
+    ]},
+    options: base
+  });
+}
+
+function sortRSP(col, btn) {
+  sortCol = col;
+  document.getElementById('rsort').querySelectorAll('.pill').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderRSPTable();
+}
+
+function renderRSPTable() {
+  var data = rspSum.slice();
+  if      (sortCol==='pph')   data.sort(function(a,b){ return b.avgPph-a.avgPph; });
+  else if (sortCol==='cube')  data.sort(function(a,b){ return b.avgCube-a.avgCube; });
+  else if (sortCol==='noatt') data.sort(function(a,b){ return b.noAtt-a.noAtt; });
+  else if (sortCol==='stem')  data.sort(function(a,b){ return b.avgStem-a.avgStem; });
+  else                        data.sort(function(a,b){ return a.rsp-b.rsp; });
+
+  document.getElementById('rsp-tbody').innerHTML = data.map(function(r) {
+    var t      = cubeTier(r.avgCube);
+    var col    = rspColor(r.rsp);
+    var pphCls = (r.avgPph>0&&r.avgPph<PPH_MIN) ? 'cell-warn' : '';
+    var facCls = r.avgFac  > FAC_GOAL ? 'cell-warn' : '';
+    var ttCls  = r.avgTime > TIME_MAX  ? 'cell-crit' : '';
+    var na     = r.noAtt    > 0 ? badge(r.noAtt, 'bcrit')                                                          : dimDash();
+    var ap     = r.appFlags > 0 ? badge(r.appFlags+' SP'+(r.appFlags>1?'s':''), 'bwarn')                          : dimDash();
+    return '<tr>' +
+      '<td><span class="rsp-tag" style="color:'+col+';">RSP '+r.rsp+'</span></td>' +
+      '<td>'+r.routes+'</td><td>'+r.stops.toLocaleString()+'</td><td>'+r.pieces.toLocaleString()+'</td>' +
+      '<td class="'+pphCls+'">'+r.avgPph.toFixed(1)+'</td>' +
+      '<td>'+r.avgStem.toFixed(2)+'</td>' +
+      '<td class="'+facCls+'">'+r.avgFac.toFixed(2)+'</td>' +
+      '<td class="'+ttCls+'">'+r.avgTime.toFixed(2)+'</td>' +
+      '<td style="font-family:var(--mono);">'+r.avgCube.toFixed(1)+'</td>' +
+      '<td>'+badge(t.label,t.cls)+'</td>' +
+      '<td>'+na+'</td><td>'+ap+'</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function buildFilterPills() {
+  var rsps = uniqueRSPs();
+  var cbHtml = '<button class="pill active" onclick="fCube(\'all\',this)">All</button>';
+  rsps.forEach(function(r){ cbHtml += '<button class="pill" style="color:'+rspColor(r)+';" onclick="fCube('+r+',this)">RSP '+r+'</button>'; });
+  document.getElementById('cube-pills').innerHTML = cbHtml;
+
+  var rtHtml = '<button class="pill active" onclick="fRoute(\'all\',this)">All</button>';
+  rsps.forEach(function(r){ rtHtml += '<button class="pill" style="color:'+rspColor(r)+';" onclick="fRoute('+r+',this)">RSP '+r+'</button>'; });
+  document.getElementById('route-pills').innerHTML = rtHtml;
+}
+
+function fCube(rsp,btn){ cubeFilter=rsp; document.getElementById('cube-pills').querySelectorAll('.pill').forEach(function(b){b.classList.remove('active');}); btn.classList.add('active'); renderCubeBars(); }
+function fRoute(rsp,btn){ routeFilter=rsp; document.getElementById('route-pills').querySelectorAll('.pill').forEach(function(b){b.classList.remove('active');}); btn.classList.add('active'); renderRouteTable(); }
+
+function renderCubeBars() {
+  var c    = getCeil();
+  var data = allData.filter(function(r){ return cubeFilter==='all'||r.rsp===cubeFilter; }).sort(function(a,b){ return a.cube-b.cube; });
+  var maxC = Math.max.apply(null, data.map(function(r){ return r.cube; }).concat([c])) * 1.15;
+  var cp   = (c/maxC*100).toFixed(1);
+  var fills = { low:'#d97706', opt:'#1a56db', near:'#d97706', over:'#e02424', none:'#9aa3b8' };
+
+  document.getElementById('cube-body').innerHTML = data.map(function(r,i) {
+    var pct  = r.cube/c*100;
+    var bw   = (r.cube/maxC*100).toFixed(1);
+    var fill = fills.none;
+    if (r.cube >= 2) { fill = pct<40 ? fills.low : pct<=80 ? fills.opt : pct<=100 ? fills.near : fills.over; }
+    var t = cubeTier(r.cube);
+    return '<div class="cb-row">' +
+      '<div class="cb-rank">'+(i+1)+'</div>' +
+      '<div class="cb-rsp" style="color:'+rspColor(r.rsp)+';">RSP '+r.rsp+'</div>' +
+      '<div class="cb-track">' +
+        '<div class="cb-fill" style="width:'+bw+'%;background:'+fill+';"></div>' +
+        '<div class="cb-ceil" style="left:'+cp+'%;"></div>' +
+      '</div>' +
+      '<div class="cb-val">'+r.cube.toFixed(1)+'</div>' +
+      '<div class="cb-pct">'+(r.cube>=2?pct.toFixed(0)+'%':'—')+'</div>' +
+      badge(t.label,t.cls) +
+      '</div>';
+  }).join('');
+}
+
+function renderRouteTable() {
+  var c    = getCeil();
+  var data = allData.filter(function(r){ return routeFilter==='all'||r.rsp===routeFilter; }).sort(function(a,b){ return a.rsp-b.rsp||b.stops-a.stops; });
+  document.getElementById('route-tbody').innerHTML = data.map(function(r) {
+    var flags   = getRouteFlags(r);
+    var hasCrit = flags.some(function(f){ return f.sev==='crit'; });
+    var cubePct = r.cube>0 ? Math.round(r.cube/c*100)+'%' : '—';
+    var t       = cubeTier(r.cube);
+    var col     = rspColor(r.rsp);
+    var facCls  = r.inFac>FAC_GOAL ? 'cell-warn' : '';
+    var ttCls   = r.totalTime>TIME_MAX ? 'cell-crit' : '';
+    var pphCls  = (r.pph>0&&r.pph<PPH_MIN&&r.stops>5) ? 'cell-warn' : '';
+    var na      = r.noAtt>0 ? badge(r.noAtt,'bcrit') : dimDash();
+    var appOk   = (!r.appVer||r.appVer==='—'||r.appVer===LATEST_APP);
+    var appCell = appOk ? '<span style="font-family:var(--mono);font-size:11px;color:var(--text3);">'+r.appVer+'</span>' : badge(r.appVer,'bwarn');
+    var sNote   = r.stem>1.5 ? '<span class="cell-note"> &#9650;</span>' : '';
+    var fHtml   = flags.length ? flags.map(function(f){ return badge(f.code, f.sev==='crit'?'bcrit':f.sev==='warn'?'bwarn':'binfo'); }).join(' ') : dimDash();
+    return '<tr class="'+(hasCrit?'row-flagged':'')+'">' +
+      '<td style="font-family:var(--mono);color:var(--text3);">'+(r.sp||'—')+'</td>' +
+      '<td><span class="rsp-tag" style="color:'+col+';">RSP '+r.rsp+'</span></td>' +
+      '<td class="'+facCls+'">'+r.inFac.toFixed(2)+'</td>' +
+      '<td>'+r.stem.toFixed(2)+sNote+'</td>' +
+      '<td class="'+ttCls+'">'+r.totalTime.toFixed(2)+'</td>' +
+      '<td>'+r.stops+'</td><td>'+r.pieces+'</td>' +
+      '<td class="'+pphCls+'">'+(r.pph>0?r.pph.toFixed(1):'—')+'</td>' +
+      '<td style="font-family:var(--mono);">'+r.cube.toFixed(1)+'</td>' +
+      '<td>'+badge(cubePct,t.cls)+'</td>' +
+      '<td>'+na+'</td><td>'+appCell+'</td><td>'+fHtml+'</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function onCeilChange() { buildRSPSummary(); renderAll(); }
+
+function resetDash() {
+  document.getElementById('upload-screen').style.display = 'flex';
+  document.getElementById('theme-float').style.display   = '';
+  document.getElementById('app').style.display           = 'none';
+  document.getElementById('file-input').value            = '';
+  document.getElementById('sheet-wrap').style.display    = 'none';
+  Object.values(charts).forEach(function(c){ c.destroy(); }); charts = {};
+  allData = []; rspSum = [];
+}
+</script>
+</body>
+</html>
